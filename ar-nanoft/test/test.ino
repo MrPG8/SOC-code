@@ -1,42 +1,94 @@
 #include <Arduino.h>
 #include <TM1637Display.h>
 
+#define ARDUINO_VOLTAGE 5.0
 #define ADC_RESOLUTION 1023.0
 
-#define PIN_OIL_PRESSURE_SENSOR 14 // A0
+#define PIN_OIL_PRESSURE_SENSOR A0 // A0
+
+#define PIN_BUTTON1 6 // D6
 
 #define PIN_DIO 3 // D3
 #define PIN_CLK 4 // D4
 
+#define DEBUG_OIL_PRESSURE false
+
 TM1637Display display(PIN_CLK, PIN_DIO);
+
+// button 1 related stuff
+unsigned long lastButton1Check = 1000;
+bool lastButton1State = false;
+
+unsigned long lastDisplayUpdate = 1000;
+
+int currentDisplayBrightness = 0;
 
 int counter = 0;
 float voltage = 1;
 float oilPressureBar = 0;
 
 void setup() {
-  // put your setup code here, to run once:
   Serial.begin(9600);
 
-  pinMode(A0, INPUT);
+  pinMode(PIN_OIL_PRESSURE_SENSOR, INPUT);  
+  pinMode(PIN_BUTTON1, INPUT_PULLUP);
   
-  display.setBrightness(1); 
+  display.setBrightness(currentDisplayBrightness);
 }
 
 void loop() {
-  // put your main code here, to run repeatedly:
-  voltage = analogRead(A0) * (5.0 / 1023.0);
-  oilPressureBar = voltageLinearConversionToBar(voltage);
-  Serial.print(voltage);
-  Serial.print("V");
-  Serial.print(" -> ");
-  Serial.print(oilPressureBar);
-  Serial.print("bar");
-  Serial.println();
+  handleButton1Stuff(millis());
+  updateDisplay(millis());
+  // delay(250);
+}
 
-  showFloatOnSegmentedDisplay(oilPressureBar);
-  // display.showNumberDec(1234);
-  delay(250);
+void handleButton1Stuff(unsigned long milliseconds) {
+  if (milliseconds - lastButton1Check >= 10) {
+    if (digitalRead(PIN_BUTTON1) == LOW) {
+      if (lastButton1State == false) {
+        // Serial.println("button pressed bro!");
+        changeDisplayBrightness();
+      }
+
+      lastButton1State = true;
+    } else {
+      lastButton1State = false;
+    }
+
+    lastButton1Check = milliseconds;
+  }
+}
+
+void changeDisplayBrightness() {
+  if (currentDisplayBrightness > 7) {
+    currentDisplayBrightness = 0;
+    return;
+  }
+
+  currentDisplayBrightness = currentDisplayBrightness + 1;
+
+  display.setBrightness(currentDisplayBrightness);
+}
+
+void updateDisplay(unsigned long milliseconds) {
+  if (milliseconds - lastDisplayUpdate >= 269) {
+    voltage = analogRead(PIN_OIL_PRESSURE_SENSOR) * (ARDUINO_VOLTAGE / ADC_RESOLUTION);
+    oilPressureBar = voltageLinearConversionToBar(voltage);
+
+    if (DEBUG_OIL_PRESSURE) {
+      Serial.print(voltage);
+      Serial.print("V");
+      Serial.print(" -> ");
+      Serial.print(oilPressureBar);
+      Serial.print("bar");
+      Serial.println();
+    }
+
+    showFloatOnSegmentedDisplay(oilPressureBar);
+    // display.showNumberDec(1234);
+
+    lastDisplayUpdate = milliseconds;
+  }
 }
 
 void showFloatOnSegmentedDisplay(float numberage) {
@@ -50,12 +102,14 @@ void showFloatOnSegmentedDisplay(float numberage) {
     fractal2Num = 9;
   }
 
-  Serial.print(integerNum);
-  Serial.print("-");
-  Serial.print(fractal1Num);
-  Serial.print("-");
-  Serial.print(fractal2Num);
-  Serial.println();
+  if (DEBUG_OIL_PRESSURE) {
+    Serial.print(integerNum);
+    Serial.print("-");
+    Serial.print(fractal1Num);
+    Serial.print("-");
+    Serial.print(fractal2Num);
+    Serial.println();
+  }
 
   if (counter > 16) {
     uint8_t data[4];
@@ -83,7 +137,7 @@ void showFloatOnSegmentedDisplay(float numberage) {
 
     display.setSegments(data);
 
-    counter++;
+    // counter++;
   }
 }
 

@@ -1,0 +1,7 @@
+PIN 1 - 5V
+PIN 2 - SIGNAL
+PIN 3 - GROUND
+
+
+---|--- -> bütyök felül
+1  2  3
